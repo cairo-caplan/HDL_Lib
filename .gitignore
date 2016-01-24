@@ -45,3 +45,6 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+.library_mapping.xml
+.settings/org.eclipse.core.resources.prefs
+.project
