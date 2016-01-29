@@ -28,8 +28,7 @@ begin
 			if en_i = '1' then
 			 binary_count   <= binary_count + 1;
                 gray_count_o <= std_logic_vector(binary_count(COUNTER_WIDTH-1) 
-                	& binary_count(COUNTER_WIDTH-2 downto 0) 
-                	xor binary_count(COUNTER_WIDTH-1 downto 1)
+                	& (binary_count(COUNTER_WIDTH-2 downto 0) xor binary_count(COUNTER_WIDTH-1 downto 1))
                 );
              end if;
 		end if;
