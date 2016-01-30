@@ -21,7 +21,7 @@ entity async_fifo is
         WriteEn_in  :in  std_logic;
         WClk        :in  std_logic;
 	 
-        Clear_in:in  std_logic
+        Clear_in	:in  std_logic
     );
 end entity;
 architecture rtl of async_fifo is
@@ -43,17 +43,14 @@ architecture rtl of async_fifo is
     signal PresetEmpty          :std_logic;
     signal empty,full           :std_logic;
     
-    component GrayCounter is
-    generic (
-        COUNTER_WIDTH :integer := 4
-    );
-    port (
-        GrayCount_out :out std_logic_vector (COUNTER_WIDTH-1 downto 0);
-        Enable_in     :in  std_logic;  --Count enable.
-        Clear_in      :in  std_logic;  --Count reset.
-        clk           :in  std_logic
-    );
-    end component;
+    component gray_counter
+    	generic(COUNTER_WIDTH : natural := 4);
+    	port(clk          : in  std_logic;
+    		 rst          : in  std_logic;
+    		 en_i         : in  std_logic;
+    		 gray_count_o : out std_logic_vector(COUNTER_WIDTH - 1 downto 0));
+    end component gray_counter;
+    
 begin
 
     --------------Code--------------/
@@ -83,21 +80,28 @@ begin
     NextReadAddressEn  <= ReadEn_in  and (not empty);
            
     --Addreses (Gray counters) logic:
-    GrayCounter_pWr : GrayCounter
-    port map (
-        GrayCount_out => pNextWordToWrite,
-        Enable_in     => NextWriteAddressEn,
-        Clear_in      => Clear_in,
-        clk           => WClk
-    );
-       
-    GrayCounter_pRd : GrayCounter
-    port map (
-        GrayCount_out => pNextWordToRead,
-        Enable_in     => NextReadAddressEn,
-        Clear_in      => Clear_in,
-        clk           => RClk
-    );
+    GrayCounter_pWr :  gray_counter
+    	generic map(
+    		COUNTER_WIDTH => 4
+    	)
+    	port map(
+    		clk          => WClk,
+    		rst          => Clear_in,
+    		en_i         => NextWriteAddressEn,
+    		gray_count_o => pNextWordToWrite
+    	);
+    	
+   GrayCounter_pRd :  gray_counter
+    	generic map(
+    		COUNTER_WIDTH => 4
+    	)
+    	port map(
+    		clk          => RClk,
+    		rst          => Clear_in,
+    		en_i         => NextReadAddressEn,
+    		gray_count_o => pNextWordToRead
+    	);
+    
 
     --'EqualAddresses' logic:
     EqualAddresses <= '1' when (pNextWordToWrite = pNextWordToRead) else '0';
