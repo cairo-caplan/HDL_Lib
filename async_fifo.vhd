@@ -6,22 +6,21 @@ library ieee;
     
 entity async_fifo is
     generic (
-        DATA_WIDTH :integer := 8;
-        ADDR_WIDTH :integer := 4
+        DATA_WIDTH	:	natural := 8;
+        ADDR_WIDTH	:	natural := 4
     );
     port (
+    	rst			:	in  std_logic;
         -- Reading port.
-        Data_out    :out std_logic_vector (DATA_WIDTH-1 downto 0);
-        Empty_out   :out std_logic;
-        ReadEn_in   :in  std_logic;
-        RClk        :in  std_logic;
+        d_o    		:	out std_logic_vector(DATA_WIDTH-1 downto 0);
+        empty_o   	:	out std_logic;
+        read_i		:	in  std_logic;
+        r_clk_i		:	in  std_logic;
         -- Writing port.
-        Data_in     :in  std_logic_vector (DATA_WIDTH-1 downto 0);
-        Full_out    :out std_logic;
-        WriteEn_in  :in  std_logic;
-        WClk        :in  std_logic;
-	 
-        Clear_in	:in  std_logic
+        d_i     	:	in  std_logic_vector(DATA_WIDTH-1 downto 0);
+        full_o   	:	out std_logic;
+        write_i  	:	in  std_logic;
+        w_clk_i		:	in  std_logic
     );
 end entity;
 architecture rtl of async_fifo is
@@ -29,18 +28,18 @@ architecture rtl of async_fifo is
     constant FIFO_DEPTH :integer := 2**ADDR_WIDTH;
 
     type RAM is array (integer range <>)of std_logic_vector (DATA_WIDTH-1 downto 0);
-    signal Mem : RAM (0 to FIFO_DEPTH-1);
+    signal mem : RAM (0 to FIFO_DEPTH-1);
     
-    signal pNextWordToWrite     :std_logic_vector (ADDR_WIDTH-1 downto 0);
-    signal pNextWordToRead      :std_logic_vector (ADDR_WIDTH-1 downto 0);
-    signal EqualAddresses       :std_logic;
-    signal NextWriteAddressEn   :std_logic;
-    signal NextReadAddressEn    :std_logic;
-    signal Set_Status           :std_logic;
-    signal Rst_Status           :std_logic;
-    signal Status               :std_logic;
-    signal PresetFull           :std_logic;
-    signal PresetEmpty          :std_logic;
+    signal w_ptr     			:std_logic_vector (ADDR_WIDTH-1 downto 0);
+    signal r_ptr      			:std_logic_vector (ADDR_WIDTH-1 downto 0);
+    signal eq_addr       		:std_logic;
+    signal w_ptr_en   			:std_logic;
+    signal r_ptr_en    			:std_logic;
+    signal set_status			:std_logic;
+    signal rst_status			:std_logic;
+    signal status				:std_logic;
+    signal preset_full			:std_logic;
+    signal preset_empty			:std_logic;
     signal empty,full           :std_logic;
     
     component gray_counter
@@ -57,102 +56,102 @@ begin
     --Data ports logic:
     --(Uses a dual-port RAM).
     --'Data_out' logic:
-    process (RClk) begin
-        if (rising_edge(RClk)) then
-            if (ReadEn_in = '1' and empty = '0') then
-                Data_out <= Mem(conv_integer(pNextWordToRead));
+    process (r_clk_i) begin
+        if (rising_edge(r_clk_i)) then
+            if (read_i = '1' and empty = '0') then
+                d_o <= mem(conv_integer(r_ptr));
             end if;
         end if;
     end process;
             
     --'Data_in' logic:
-    process (WClk) begin
-        if (rising_edge(WClk)) then
-            if (WriteEn_in = '1' and full = '0') then
-                Mem(conv_integer(pNextWordToWrite)) <= Data_in;
+    process (w_clk_i) begin
+        if (rising_edge(w_clk_i)) then
+            if (write_i = '1' and full = '0') then
+                mem(conv_integer(w_ptr)) <= d_i;
             end if;
         end if;
     end process;
 
     --Fifo addresses support logic: 
     --'Next Addresses' enable logic:
-    NextWriteAddressEn <= WriteEn_in and (not full);
-    NextReadAddressEn  <= ReadEn_in  and (not empty);
+    w_ptr_en <= write_i and (not full);
+    r_ptr_en  <= read_i  and (not empty);
            
     --Addreses (Gray counters) logic:
-    GrayCounter_pWr :  gray_counter
+    gray_counter_w_ptr :  gray_counter
     	generic map(
     		COUNTER_WIDTH => 4
     	)
     	port map(
-    		clk          => WClk,
-    		rst          => Clear_in,
-    		en_i         => NextWriteAddressEn,
-    		gray_count_o => pNextWordToWrite
+    		clk          => w_clk_i,
+    		rst          => rst,
+    		en_i         => w_ptr_en,
+    		gray_count_o => w_ptr
     	);
     	
-   GrayCounter_pRd :  gray_counter
+   gray_counter_r_ptr :  gray_counter
     	generic map(
     		COUNTER_WIDTH => 4
     	)
     	port map(
-    		clk          => RClk,
-    		rst          => Clear_in,
-    		en_i         => NextReadAddressEn,
-    		gray_count_o => pNextWordToRead
+    		clk          => r_clk_i,
+    		rst          => rst,
+    		en_i         => r_ptr_en,
+    		gray_count_o => r_ptr
     	);
     
 
     --'EqualAddresses' logic:
-    EqualAddresses <= '1' when (pNextWordToWrite = pNextWordToRead) else '0';
+    eq_addr <= '1' when (w_ptr = r_ptr) else '0';
 
     --'Quadrant selectors' logic:
-    process (pNextWordToWrite, pNextWordToRead)
+    process (w_ptr, r_ptr)
         variable set_status_bit0 :std_logic;
         variable set_status_bit1 :std_logic;
         variable rst_status_bit0 :std_logic;
         variable rst_status_bit1 :std_logic;
     begin
-        set_status_bit0 := pNextWordToWrite(ADDR_WIDTH-2) xnor pNextWordToRead(ADDR_WIDTH-1);
-        set_status_bit1 := pNextWordToWrite(ADDR_WIDTH-1) xor  pNextWordToRead(ADDR_WIDTH-2);
-        Set_Status <= set_status_bit0 and set_status_bit1;
+        set_status_bit0 := w_ptr(ADDR_WIDTH-2) xnor r_ptr(ADDR_WIDTH-1);
+        set_status_bit1 := w_ptr(ADDR_WIDTH-1) xor  r_ptr(ADDR_WIDTH-2);
+        set_status <= set_status_bit0 and set_status_bit1;
         
-        rst_status_bit0 := pNextWordToWrite(ADDR_WIDTH-2) xor  pNextWordToRead(ADDR_WIDTH-1);
-        rst_status_bit1 := pNextWordToWrite(ADDR_WIDTH-1) xnor pNextWordToRead(ADDR_WIDTH-2);
-        Rst_Status      <= rst_status_bit0 and rst_status_bit1;
+        rst_status_bit0 := w_ptr(ADDR_WIDTH-2) xor  r_ptr(ADDR_WIDTH-1);
+        rst_status_bit1 := w_ptr(ADDR_WIDTH-1) xnor r_ptr(ADDR_WIDTH-2);
+        rst_status      <= rst_status_bit0 and rst_status_bit1;
     end process;
     
     --'Status' latch logic:
-    process (Set_Status, Rst_Status, Clear_in) begin--D Latch w/ Asynchronous Clear & Preset.
-        if (Rst_Status = '1' or Clear_in = '1') then
-            Status <= '0';  --Going 'Empty'.
-        elsif (Set_Status = '1') then
-            Status <= '1';  --Going 'Full'.
+    process (set_status, rst_status, rst) begin--D Latch w/ Asynchronous Clear & Preset.
+        if (rst_status = '1' or rst = '1') then
+            status <= '0';  --Going 'Empty'.
+        elsif (set_status = '1') then
+            status <= '1';  --Going 'Full'.
         end if;
     end process;
     
     --'Full_out' logic for the writing port:
-    PresetFull <= Status and EqualAddresses;  --'Full' Fifo.
+    preset_full <= status and eq_addr;  --'Full' Fifo.
     
-    process (WClk, PresetFull) begin --D Flip-Flop w/ Asynchronous Preset.
-        if (PresetFull = '1') then
+    process (w_clk_i, preset_full) begin --D Flip-Flop w/ Asynchronous Preset.
+        if (preset_full = '1') then
             full <= '1';
-        elsif (rising_edge(WClk)) then
+        elsif (rising_edge(w_clk_i)) then
             full <= '0';
         end if;
     end process;
-    Full_out <= full;
+    full_o <= full;
     
     --'Empty_out' logic for the reading port:
-    PresetEmpty <= not Status and EqualAddresses;  --'Empty' Fifo.
+    preset_empty <= not status and eq_addr;  --'Empty' Fifo.
     
-    process (RClk, PresetEmpty) begin --D Flip-Flop w/ Asynchronous Preset.
-        if (PresetEmpty = '1') then
+    process (r_clk_i, preset_empty) begin --D Flip-Flop w/ Asynchronous Preset.
+        if (preset_empty = '1') then
             empty <= '1';
-        elsif (rising_edge(RClk)) then
+        elsif (rising_edge(r_clk_i)) then
             empty <= '0';
         end if;
     end process;
     
-    Empty_out <= empty;
+    empty_o <= empty;
 end architecture;

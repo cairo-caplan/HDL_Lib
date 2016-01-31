@@ -6,7 +6,7 @@ use ieee.numeric_std.all;
 
 entity fifo is
 	generic (
-		WIDTH	:	natural	:=	8;
+		DATA_WIDTH	:	natural	:=	8;
 		LENGTH	:	natural := 4
 	);
 	port (
@@ -14,9 +14,9 @@ entity fifo is
 		a_rst	:	in std_logic;
 		rst 	:	in std_logic;
 		we_i	:	in std_logic;
-		d_i		:	in	std_logic_vector(WIDTH - 1 DOWNTO 0);
+		d_i		:	in	std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
 		re_i	:	in	std_logic;
-		d_o		:	out	std_logic_vector(WIDTH - 1 DOWNTO 0);
+		d_o		:	out	std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
 		full_o	:	out	std_logic;
 		empty_o	:	out	std_logic
 		
@@ -24,7 +24,7 @@ entity fifo is
 end entity fifo;
 
 architecture RTL of fifo is
-	type internal_data_t is array (natural range <>) of std_logic_vector(WIDTH-1 downto 0);
+	type internal_data_t is array (natural range <>) of std_logic_vector(DATA_WIDTH-1 downto 0);
 	
 	signal internal_data	:	internal_data_t(0 to LENGTH -1) := (others=> (others=>'0'));
 	signal	w_ptr, r_ptr	:	natural range 0 to LENGTH -1;
