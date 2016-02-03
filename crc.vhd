@@ -30,11 +30,11 @@ entity crc is
 		POLY		:	std_logic_vector((2*8)-1 downto 0) := x"8408"
 	);
 	port (
-		d 			: 	in	std_logic_vector(DATA_WIDTH-1 downto 0);
-		init		:	in	std_logic;
-		d_valid		:	in	std_logic;
 		clk			:	in	std_logic;
-		reset_b		:	in	std_logic;
+		rst			:	in	std_logic;
+		d_i 		: 	in	std_logic_vector(DATA_WIDTH-1 downto 0);
+		init_i		:	in	std_logic;
+		d_valid_i	:	in	std_logic;
 		crc_o		: 	out	std_logic_vector(CRC_WIDTH-1 downto 0)
 	);
 end entity crc;
@@ -97,33 +97,32 @@ begin
 	
 	
 	
-	d_or_crc_i_init : process(d,crc_int,init) is
+	async_proc : process(d_i,crc_int,init_i) is
 	begin
-		if (init = '1') then
-			next_crc <= crc_calc(INIT_VAL, d);
+		if (init_i = '1') then
+			next_crc <= crc_calc(INIT_VAL, d_i);
 		else
-			next_crc <= crc_calc(crc_int,d);
+			next_crc <= crc_calc(crc_int,d_i);
 		end if;
 		
-	end process d_or_crc_i_init;
+	end process async_proc;
 	
-	--! synopsys async_set_reset "reset_b"
-	synopsys_async_set_reset : process (clk, reset_b) is
+	sync_proc : process (clk, rst) is
 	begin
-		if reset_b = '0' then
+		if rst = '1' then
 			crc_int <=  INIT_VAL;
 		elsif rising_edge(clk) then
 			
-			if (init and (not d_valid))='1' then
+			if (init_i and (not d_valid_i))='1' then
 				crc_int <=INIT_VAL;
-			elsif (d_valid='1') then
+			elsif (d_valid_i='1') then
 				crc_int <= next_crc;
 			else
 				crc_int <= crc_int;
 			end if;
 			
 		end if;
-	end process synopsys_async_set_reset;
+	end process sync_proc;
 	
 	crc_o <= crc_int;
 	
