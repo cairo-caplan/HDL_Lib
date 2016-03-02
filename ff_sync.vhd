@@ -2,7 +2,6 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
-
 entity ff_sync is
 	generic(
 		nr_stages	:	natural :=2
